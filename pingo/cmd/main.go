@@ -30,23 +30,37 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	for i := 0; i < n; i++ {
+	var (
+		i             int
+		numErrors     int
+		totalDuration time.Duration
+	)
+	defer func() {
+		fmt.Printf("Summary:\n")
+		fmt.Printf("%d requests\n", i)
+		fmt.Printf("%d errors (%f%%)\n", numErrors, float64(numErrors)/float64(i))
+		fmt.Printf("average latency: %v\n", totalDuration/time.Duration(i))
+	}()
+	for ; i < n; i++ {
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(sleep):
 			break
 		}
-		sendPing(ctx, hostname, timeout)
+		elapsed, err := sendPing(ctx, hostname, timeout)
+		if err != nil {
+			fmt.Printf("error: %v", err)
+			numErrors++
+			continue
+		}
+		totalDuration += elapsed
+		fmt.Printf("elapsed time: %v\n", elapsed)
 	}
 }
 
-func sendPing(ctx context.Context, hostname string, timeout time.Duration) {
+func sendPing(ctx context.Context, hostname string, timeout time.Duration) (time.Duration, error) {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	elapsedTime, err := ping.Ping(ctx, hostname)
-	if err != nil {
-		log.Fatalf("error: %v", err)
-	}
-	fmt.Printf("elapsed time: %v\n", elapsedTime)
+	return ping.Ping(ctx, hostname)
 }
