@@ -24,8 +24,7 @@ func Ping(ctx context.Context, host string) (time.Duration, error) {
 	}
 	defer conn.Close()
 
-	var outBuf [56]byte
-	p, err := outgoingPayload(outBuf[:], rand.Int(), 0)
+	p, err := outgoingPayload(rand.Int(), 0)
 	if err != nil {
 		return 0, fmt.Errorf("error creating outgoing payload: %w", err)
 	}
@@ -52,7 +51,7 @@ func Ping(ctx context.Context, host string) (time.Duration, error) {
 		}
 		timeElapsed = time.Since(timeSent)
 		if err := checkIncomingPayload(inBuf[:]); err != nil {
-			return fmt.Errorf("error: %w", err)
+			return fmt.Errorf("error in incoming payload: %w", err)
 		}
 		return nil
 	})
@@ -60,7 +59,7 @@ func Ping(ctx context.Context, host string) (time.Duration, error) {
 	return timeElapsed, err
 }
 
-func outgoingPayload(buf []byte, id int, seq int) ([]byte, error) {
+func outgoingPayload(id int, seq int) ([]byte, error) {
 	msg := icmp.Message{
 		Type: ipv4.ICMPTypeEcho,
 		Body: &icmp.Echo{
@@ -69,16 +68,13 @@ func outgoingPayload(buf []byte, id int, seq int) ([]byte, error) {
 			Data: nil,
 		},
 	}
-	return msg.Marshal(buf)
+	return msg.Marshal(nil)
 }
 
 func checkIncomingPayload(buf []byte) error {
-	msg, err := icmp.ParseMessage(1, buf)
+	_, err := icmp.ParseMessage(1, buf)
 	if err != nil {
 		return fmt.Errorf("error parsing mesage")
-	}
-	if msg.Body.Len(0) != 0 {
-		return fmt.Errorf("expected 0 bytes in the body")
 	}
 	return nil
 }
